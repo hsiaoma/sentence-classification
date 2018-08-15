@@ -69,15 +69,16 @@ def load_data(args):
     args['embedding_dim'] = meta['embedding_dim']
     args['vocab_size'] = meta['vocab_size']
     args['embedding_file'] = meta['embedding_file']
-    #args['embedding_file'] = 'embedding_files/dummy.embedding'
-    #args['vocab_size'] = 10
     with open('{:s}'.format(args.data_file), 'rb') as f:
         data = msgpack.load(f, encoding = 'utf-8', use_list = True)
 
     ret = []
     for target in ['train', 'valid', 'test']:
-        for content in ['data', 'label']:
-            ret.append(nd.array(data[target][content]))
+
+        ret.append([sent[:] for sent in nd.array(data[target]['data'])])
+        ret.append(nd.array(data[target]['label']))
+        #for content in ['data', 'label']:
+        #    ret.append(nd.array(data[target][content]))
     ret.append(nd.array(meta['embedding']))
     return ret
 
@@ -146,7 +147,7 @@ def run(args, log):
     #embedding = text.embedding.CustomEmbedding(args.embedding_file, elem_delim = ' ')
     #embedding.update_token_vectors('<unk>', nd.uniform(low = -0.05, high = 0.05, shape = 300))
 
-    net = ParaTextCNN(args)
+    net = Source2TokenAttention(args)
     if args.resume and os.path.exists(args.saved_model_name):
         net.load_parameters(args.saved_model_name, ctx = mx.cpu())
         log.info("model {:s} loaded".format(args.saved_model_name))
@@ -177,7 +178,7 @@ def run(args, log):
     auc, mean_loss, acc = test(net, test_data)
     log.info ("test auc = {:.5f}, mean_loss = {:.5f}, acc = {:.5f}".format(auc, mean_loss, acc))
 
-    best_net = ParaTextCNN(args)
+    best_net = Source2TokenAttention(args)
     best_net.load_parameters(args.best_in_valid_model_name, ctx = mx.cpu())
     auc, mean_loss, acc = test(best_net, test_data)
     log.info ("best net auc = {:.5f}, mean_loss = {:.5f}, acc = {:.5f}".format(auc, mean_loss, acc))
