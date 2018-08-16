@@ -119,9 +119,6 @@ class ParaTextCNN(nn.Block):
             self.output = nn.Dense(units = config['num_classes'])
             self.dropout = nn.Dropout(config['dropout_rate'])
 
-            self.conv2 = ParaConvpool(config, kernel_idx = 1)
-            self.conv3 = ParaConvpool(config, kernel_idx = 2)
-
 
     def forward(self, x):
         sent = self.embedding(x)
@@ -158,12 +155,18 @@ class Source2TokenAttention(nn.Block):
                                units = config.num_classes,
                                activation = None,
                                )
+            #self.output = nn.Conv1D(channels = config.num_classes,
+            #                      kernel_size = config.hidden_dim,
+            #                      strides = config.hidden_dim,
+            #                      activation = None)
+            #self.conv = nn.Conv1D(channels = 1, kernel_size = 1, strides = 1, activation = None)
     def forward(self, x, x_mask = None):
         x = self.embedding(x)
         x = self.map(x)
         x = x.reshape((x.shape[0], self.config.num_neighbor, -1, self.config.hidden_dim))
         x = self.s2t(x)
         x = self.p2s(x)
+        #x = self.conv(x).squeeze(axis = 1)
         return self.output(x)
 
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 python train.py \
-    --data_file='20180805/data.msgpack' \
-    --meta_file='20180805/meta.msgpack' \
+    --data_file='data/data.msgpack' \
+    --meta_file='data/meta.msgpack' \
     --log_file='log/s2t_double.log' \
     --best_in_valid_model_name='s2t_double.param' \
     --saved_model_name='' \
