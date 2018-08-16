@@ -5,6 +5,7 @@ Created on Wed Aug  8 19:19:46 2018
 
 @author: maxiao
 """
+import pdb
 import numpy as np
 import mxnet as mx
 from mxnet.gluon import nn
@@ -25,27 +26,28 @@ def mask_for_tensor(val, val_mask):
 
 
 class MultiDimensionalAttention(nn.Block):
-    def __init__(self, config):
+    def __init__(self, config, axis = 1):
+        self.axis = axis
         super(MultiDimensionalAttention, self).__init__()
         with self.name_scope():
-            self.linear1 = nn.Dense(in_units = 2 * config.hidden_dim,
-                                    units = 2 * config.hidden_dim, 
+            self.linear1 = nn.Dense(in_units = config.hidden_dim,
+                                    units = config.hidden_dim,
                                     activation = config.activation,
                                     flatten = False)
-            self.linear2 = nn.Dense(in_units = 2 * config.hidden_dim,
-                                    units = 2 * config.hidden_dim, 
+            self.linear2 = nn.Dense(in_units = config.hidden_dim,
+                                    units = config.hidden_dim,
                                     activation = None,
                                     flatten = False)
-    
-    def forward(self, x, x_mask):
+
+    def forward(self, x, _mask = None):
         map1 = self.linear1(x)
         map2 = self.linear2(map1)
         #map2 = exp_mask_for_tensor(map2, x_mask)
-        soft = nd.softmax(map2, axis = 1)
-        out = (soft * x).sum(1)
+        soft = nd.softmax(map2, axis = self.axis)
+        out = (soft * x).sum(axis = self.axis)
         return out
-    
-    
+
+
 def scaled_tanh(x, scale = 5.0):
     return scale * nd.tanh(1.0 / scale * x)
 
@@ -67,28 +69,28 @@ class DiSelfAttention(nn.Block):
         #self.f_bias = nd.zeros([config.hidden_dim])
         #self.o_bias = nd.zeros([config.hidden_dim])
         with self.name_scope():
-            self.linear1 = nn.Dense(in_units = config.embedding_dim, 
-                                    units = config.hidden_dim, 
+            self.linear1 = nn.Dense(in_units = config.embedding_dim,
+                                    units = config.hidden_dim,
                                     activation = config.activation,
                                     flatten = False)
-            self.linear2 = nn.Dense(in_units = config.hidden_dim, 
-                                    units = config.hidden_dim, 
-                                    use_bias = False, 
+            self.linear2 = nn.Dense(in_units = config.hidden_dim,
+                                    units = config.hidden_dim,
+                                    use_bias = False,
                                     flatten = False,
                                     activation = None)
-            self.linear3 = nn.Dense(in_units = config.hidden_dim, 
-                                    units = config.hidden_dim, 
-                                    use_bias = False, 
+            self.linear3 = nn.Dense(in_units = config.hidden_dim,
+                                    units = config.hidden_dim,
+                                    use_bias = False,
                                     flatten = False,
                                     activation = None)
-            self.linear4 = nn.Dense(in_units = config.hidden_dim, 
-                                    units = config.hidden_dim, 
-                                    use_bias = False, 
+            self.linear4 = nn.Dense(in_units = config.hidden_dim,
+                                    units = config.hidden_dim,
+                                    use_bias = False,
                                     flatten = False,
                                     activation = None)
-            self.linear5 = nn.Dense(in_units = config.hidden_dim, 
-                                    units = config.hidden_dim, 
-                                    use_bias = False, 
+            self.linear5 = nn.Dense(in_units = config.hidden_dim,
+                                    units = config.hidden_dim,
+                                    use_bias = False,
                                     flatten = False,
                                     activation = None)
             self.dropout = nn.Dropout(rate = config.dropout_rate)
@@ -107,17 +109,17 @@ class DiSelfAttention(nn.Block):
         #x_map_tile = x_map.expand_dims(1) #
         x_map_tile = nd.tile(x_map.expand_dims(1), (1, sl, 1, 1)) # bs, sl, sl, vec
         x_map_drop = self.dropout(x_map)
-        
+
         dependent = self.linear2(x_map_drop)
         dependent_etd = dependent.expand_dims(1)
         head = self.linear3(x_map_drop)
         head_etd = head.expand_dims(2)
         loggits = scaled_tanh(dependent_etd + head_etd + self.f_bias, 5.0)
-        
+
         loggits_masked = exp_mask_for_tensor(loggits, mask)
         attn_score = nd.softmax(loggits_masked, 2)
         attn_score = mask_for_tensor(attn_score, mask)
-        
+
         attn_result = (attn_score * x_map_tile).nansum(2)
         fusion_gate = nd.sigmoid(self.linear4(x_map) + self.linear5(attn_result) + self.o_bias)
         output = fusion_gate * x_map + (1 - fusion_gate) * attn_result
@@ -127,13 +129,13 @@ class SelfAttentionNet(nn.Block):
     def __init__(self, config):
         super(SelfAttentionNet, self).__init__()
         with self.name_scope():
-            self.embedding = nn.Embedding(input_dim = config.vocab_size, 
+            self.embedding = nn.Embedding(input_dim = config.vocab_size,
                                           output_dim = config.embedding_dim)
             self.di_fw = DiSelfAttention(config, direction = 'forward')
             self.di_bw = DiSelfAttention(config, direction = 'backward')
             self.multi_self_attention = MultiDimensionalAttention(config)
-            self.output = nn.Dense(in_units = 2 * config.hidden_dim, 
-                                   units = config.num_classes, 
+            self.output = nn.Dense(in_units = 2 * config.hidden_dim,
+                                   units = config.num_classes,
                                    activation = None,
                                    )
     def forward(self, x, x_mask = None):
@@ -145,15 +147,15 @@ class SelfAttentionNet(nn.Block):
         out = self.output(out)
         #out = nd.softmax(out, axis = -1)
         return out
-    
 
 
 
 
 
-if __name__ == '__main__':        
-    from utils import DictClass  
-    config = {'hidden_dim':3, 
+
+if __name__ == '__main__':
+    from utils import DictClass
+    config = {'hidden_dim':3,
               'activation':'relu',
               'dropout_rate':0.5,
               'vocab_size': 10,
@@ -176,7 +178,7 @@ if __name__ == '__main__':
     net.collect_params().initialize(init.Xavier(), ctx = mx.cpu())
     net.embedding.weight.set_data(embedding.idx_to_vec)
     softmax_cross_entropy = gluon.loss.SoftmaxCrossEntropyLoss()
-    
+
     for data, label in train_data:
         with autograd.record():
             out = net(data)

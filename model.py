@@ -14,7 +14,7 @@ import mxnet as mx
 from mxnet.gluon import nn
 from mxnet import nd, gluon, init, autograd
 from mxnet.contrib import text
-
+from layers import MultiDimensionalAttention
 
 class Convpool(nn.Block):
     def __init__(self, channels, kernel_size, **kwargs):
@@ -119,9 +119,6 @@ class ParaTextCNN(nn.Block):
             self.output = nn.Dense(units = config['num_classes'])
             self.dropout = nn.Dropout(config['dropout_rate'])
 
-            self.conv2 = ParaConvpool(config, kernel_idx = 1)
-            self.conv3 = ParaConvpool(config, kernel_idx = 2)
-
 
     def forward(self, x):
         sent = self.embedding(x)
@@ -144,6 +141,7 @@ class ParaTextCNN(nn.Block):
 class Source2TokenAttention(nn.Block):
     def __init__(self, config):
         super(Source2TokenAttention, self).__init__()
+        self.config = config
         with self.name_scope():
             self.embedding = nn.Embedding(input_dim = config.vocab_size,
                                           output_dim = config.embedding_dim)
@@ -151,27 +149,25 @@ class Source2TokenAttention(nn.Block):
                                 units = config.hidden_dim,
                                 activation = config.activation,
                                 flatten = False)
-            self.linear1 = nn.Dense(in_units = config.hidden_dim,
-                                    units = config.hidden_dim,
-                                    activation = config.activation,
-                                    flatten = False)
-            self.linear2 = nn.Dense(in_units = config.hidden_dim,
-                                    units = config.hidden_dim,
-                                    activation = None,
-                                    flatten = False)
+            self.s2t = MultiDimensionalAttention(config, axis = 2)
+            self.p2s = MultiDimensionalAttention(config, axis = 1)
             self.output = nn.Dense(in_units = config.hidden_dim,
                                units = config.num_classes,
                                activation = None,
                                )
+            #self.output = nn.Conv1D(channels = config.num_classes,
+            #                      kernel_size = config.hidden_dim,
+            #                      strides = config.hidden_dim,
+            #                      activation = None)
+            #self.conv = nn.Conv1D(channels = 1, kernel_size = 1, strides = 1, activation = None)
     def forward(self, x, x_mask = None):
         x = self.embedding(x)
         x = self.map(x)
-        map1 = self.linear1(x)
-        map2 = self.linear2(map1)
-        #map2 = exp_mask_for_tensor(map2, x_mask)
-        soft = nd.softmax(map2, axis = 1)
-        out = (soft * x).sum(1)
-        return self.output(out)
+        x = x.reshape((x.shape[0], self.config.num_neighbor, -1, self.config.hidden_dim))
+        x = self.s2t(x)
+        x = self.p2s(x)
+        #x = self.conv(x).squeeze(axis = 1)
+        return self.output(x)
 
 
 if __name__ == '__main__':
@@ -179,7 +175,7 @@ if __name__ == '__main__':
     config = arg_parse()
     config['embedding_dim'] = 300
     config['vocab_size'] = 10
-    net = ParaTextCNN(config)
+    net = Source2TokenAttention(config)
 
     data = nd.array([[np.random.randint(10) for _ in range(200)] for _ in range(1000)])
     label = nd.array([np.random.randint(2) for _ in range(1000)])

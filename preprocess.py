@@ -114,26 +114,26 @@ def main():
     embedding = TextUtil(args.words_file, args.embedding_file)
     log.info('embedding file loaded, # of words = {:d}, dimension = {:d}'.format(len(embedding), embedding.vec_len))
 
-#    data = {}
-#    for target in ['train', 'valid', 'test']:
-#        raw_data, label = load_raw_text(args.data_folder + '{:s}.txt'.format(target), is_test = args.is_test == 1)
-#        enc = onehot_enc(raw_data, embedding, args.sent_len, args.list_len, args.mode)
-#        data[target] = {}
-#        data[target]['data'] = enc
-#        data[target]['label'] = label
-#        log.info('# of {:s} examples = {:d}'.format(target, len(enc)))
     data = {}
-    data_tuple = load_encoded_csv('{:s}/raw_data.csv'.format(args.data_folder), args.num_workers)
-    targets = ['train', 'valid', 'test']
-    interval = [(0, 0.8), (0.8, 0.9), (0.9, 1)]
-    for i in range(len(targets)):
-        target = targets[i]
-        start = int(interval[i][0] * len(data_tuple))
-        end = int(interval[i][1] * len(data_tuple))
+    for target in ['train', 'valid', 'test']:
+        raw_data, label = load_raw_text(args.data_folder + '{:s}.txt'.format(target), is_test = args.is_test == 1)
+        enc = onehot_enc(raw_data, embedding, args.sent_len, args.list_len, args.mode)
         data[target] = {}
-        data[target]['label'] = [tup[1] for tup in data_tuple[start : end]]
-        data[target]['data'] = [tup[2] for tup in data_tuple[start : end]]
-        log.info('# of {:s} examples = {:d}'.format(target, len(data[target]['label'])))
+        data[target]['data'] = enc
+        data[target]['label'] = label
+        log.info('# of {:s} examples = {:d}'.format(target, len(enc)))
+#    data = {}
+#    data_tuple = load_encoded_csv('{:s}/raw_data.csv'.format(args.data_folder), args.num_workers)
+#    targets = ['train', 'valid', 'test']
+#    interval = [(0, 0.8), (0.8, 0.9), (0.9, 1)]
+#    for i in range(len(targets)):
+#        target = targets[i]
+#        start = int(interval[i][0] * len(data_tuple))
+#        end = int(interval[i][1] * len(data_tuple))
+#        data[target] = {}
+#        data[target]['label'] = [tup[1] for tup in data_tuple[start : end]]
+#        data[target]['data'] = [tup[2] for tup in data_tuple[start : end]]
+#        log.info('# of {:s} examples = {:d}'.format(target, len(data[target]['label'])))
 
 
     with open('{:s}/{:s}'.format(args.data_folder, args.data_out_file), 'wb') as f:
